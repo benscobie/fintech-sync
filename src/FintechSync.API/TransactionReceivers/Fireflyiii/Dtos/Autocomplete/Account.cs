@@ -5,7 +5,7 @@ namespace FintechSync.API.TransactionReceivers.Fireflyiii.Dtos.Autocomplete
     public class Account
     {
         [JsonPropertyName("id")]
-        public string Id { get; set; }
+        public int Id { get; set; }
 
         [JsonPropertyName("name")]
         public string Name { get; set; }

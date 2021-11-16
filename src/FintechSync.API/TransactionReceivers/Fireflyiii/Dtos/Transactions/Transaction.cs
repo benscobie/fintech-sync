@@ -2,7 +2,7 @@
 
 namespace FintechSync.API.Receivers.Fireflyiii.Dtos.Transactions
 {
-    public class RootTransaction
+    public class TransactionGroup
     {
         [JsonPropertyName("error_if_duplicate_hash")]
         public bool ErrorIfDuplicateHash { get; set; }
@@ -68,7 +68,7 @@ namespace FintechSync.API.Receivers.Fireflyiii.Dtos.Transactions
         public string SourceName { get; set; }
 
         [JsonPropertyName("destination_id")]
-        public string DestinationId { get; set; }
+        public int DestinationId { get; set; }
 
         [JsonPropertyName("destination_name")]
         public string DestinationName { get; set; }

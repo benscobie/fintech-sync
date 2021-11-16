@@ -1,5 +1,6 @@
 ﻿using FintechSync.API.Receivers.Fireflyiii.Dtos.Transactions;
 using FintechSync.API.TransactionReceivers.Fireflyiii;
+using FintechSync.API.TransactionReceivers.Fireflyiii.Dtos.Accounts;
 
 namespace FintechSync.API.Receivers.Fireflyiii
 {
@@ -25,12 +26,11 @@ namespace FintechSync.API.Receivers.Fireflyiii
             await _client.NewTransactionAsync(fireflyTransaction);
         }
 
-        private async Task<RootTransaction> MapTransactionAsync(Domain.Transaction transaction)
+        private async Task<TransactionGroup> MapTransactionAsync(Domain.Transaction transaction)
         {
             var theTransaction =
                     new Dtos.Transactions.Transaction
                     {
-                        Type = transaction.Amount < 0 ? "withdrawal" : "deposit",
                         Amount = Math.Abs(transaction.Amount).ToString(),
                         CurrencyCode = transaction.Currency,
                         ForeignCurrencyCode = transaction.ForeignCurrency,
@@ -40,9 +40,37 @@ namespace FintechSync.API.Receivers.Fireflyiii
                         Order = 1
                     };
 
-            var accounts = await _client.SearchAccountsAsync(transaction.Merchant, transaction.Amount < 0 ? "expense" : "revenue");
+            var accountId = await GetAccountId(transaction);
+            if (transaction.Amount < 0)
+            {
+                theTransaction.Type = "withdrawal";
+                theTransaction.DestinationId = accountId;
+                theTransaction.SourceId = _config.SourceAccountId;
+            } else
+            {
+                theTransaction.Type = "deposit";
+                theTransaction.SourceId = accountId;
+                theTransaction.DestinationId = _config.SourceAccountId;
+            }
 
-            string destinationId;
+            return new TransactionGroup
+            {
+                ApplyRules = true,
+                ErrorIfDuplicateHash = true,
+                FireWebhooks = true,
+                Transactions = new List<Dtos.Transactions.Transaction>
+                {
+                    theTransaction
+                }
+            };
+        }
+
+        private async Task<int> GetAccountId(Domain.Transaction transaction)
+        {
+            var accountType = transaction.Amount < 0 ? "expense" : "revenue";
+            var accounts = await _client.SearchAccountsAsync(transaction.Merchant, accountType);
+
+            int destinationId;
             if (accounts.Count == 1)
             {
                 destinationId = accounts.Single().Id;
@@ -61,23 +89,17 @@ namespace FintechSync.API.Receivers.Fireflyiii
             }
             else
             {
-                // TODO Create an account
-                throw new NotImplementedException();
+                var newAccount = new NewAccount
+                {
+                    Name = transaction.Merchant,
+                    Type = accountType,
+                };
+
+                var account = await _client.NewAccountAsync(newAccount);
+                destinationId = account.Data.Id;
             }
 
-            theTransaction.DestinationId = destinationId;
-            theTransaction.SourceId = _config.SourceAccountId;
-
-            return new RootTransaction
-            {
-                ApplyRules = true,
-                ErrorIfDuplicateHash = true,
-                FireWebhooks = true,
-                Transactions = new List<Dtos.Transactions.Transaction>
-                {
-                    theTransaction
-                }
-            };
+            return destinationId;
         }
     }
 }
